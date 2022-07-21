@@ -1,0 +1,23 @@
+---
+title: "Main Processing File"
+author: "Kuiyuan Shao"
+date: '2022-07-21'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("devtools")
+#devtools::install_github("agnesdeng/mixgb")
+#load mixgb
+library(mixgb)
+source("dataSim.R")
+```
+
+```{r}
+valid_mixgb <- mixgb(data = validated, m = 5, save.models = TRUE,
+    save.vars = NULL)
+```
