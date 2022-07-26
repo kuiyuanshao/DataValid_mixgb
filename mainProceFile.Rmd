@@ -12,12 +12,21 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #install.packages("devtools")
 #devtools::install_github("agnesdeng/mixgb")
-#load mixgb
 library(mixgb)
-source("dataSim.R")
+source("dataSim2.R")
 ```
 
 ```{r}
-valid_mixgb <- mixgb(data = validated, m = 5, save.models = TRUE,
-    save.vars = NULL)
+data <- simFun(2000, 1000)
+imp <- mixgb(data[[2]], m = 5)
+```
+
+```{r}
+full_fit <- lm(Y ~ X + Z, data = data[[1]])
+valid_fit <- lm(Y ~ X + Z, data = data[[3]])
+imp_fit <- lm(Y ~ X + Z, data = imp[[1]])
+
+summary(full_fit)
+summary(valid_fit)
+summary(imp_fit)
 ```
