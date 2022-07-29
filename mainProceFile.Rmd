@@ -12,21 +12,170 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #install.packages("devtools")
 #devtools::install_github("agnesdeng/mixgb")
+#load mixgb
 library(mixgb)
-source("dataSim2.R")
+library(mice)
+source("dataSim.R")
+```
+
+```{r warning = F}
+full_data <- simFun(2000)
+data <- lapply(seq(100, 1500, length.out = 15), function(i) sampleFun(full_data, n = i))
+imp1 <- mixgb(data1[[2]], m = 5)
+
+data2 <- sampleFun(full_data, 300)
+imp2 <- mixgb(data2[[2]], m = 5)
+
+data3 <- sampleFun(full_data, 400)
+imp3 <- mixgb(data3[[2]], m = 5)
+
+data4 <- sampleFun(full_data, 500)
+imp4 <- mixgb(data4[[2]], m = 5)
+
+data5 <- sampleFun(full_data, 600)
+imp5 <- mixgb(data5[[2]], m = 5)
+
+data6 <- sampleFun(full_data, 700)
+imp6 <- mixgb(data6[[2]], m = 5)
+
+data7 <- sampleFun(full_data, 800)
+imp7 <- mixgb(data7[[2]], m = 5)
+
+data8 <- sampleFun(full_data, 900)
+imp8 <- mixgb(data8[[2]], m = 5)
+
+data9 <- sampleFun(full_data, 1000)
+imp9 <- mixgb(data9[[2]], m = 5)
+
+imp <- list(imp1, imp2, imp3, imp4, imp5, imp6, imp7, imp8, imp9)
+data <- list(data1, data2, data3, data4, data5, data6, data7, data8, data9)
+```
+
+```{r warning = F, message = F}
+library(ggpubr)
+scatterFun <- function(imp, data){
+  infolist <- list()
+  for (i in 1:length(imp)){
+    the_p <- ggplot(imp[[i]], aes(x = X, y = Y, colour = Z)) +
+        geom_point(alpha = 0.2) +
+        geom_smooth(method = lm) +
+        theme(legend.position="none")
+    infolist[[i]] <- the_p
+  }
+  validated <- ggplot(data[[3]], aes(x = X, y = Y, colour = Z)) +
+        geom_point(alpha = 0.2) +
+        geom_smooth(method = lm) +
+        theme(legend.position="none")
+  full <- ggplot(data[[1]], aes(x = X, y = Y, colour = Z)) +
+        geom_point(alpha = 0.2) +
+        geom_smooth(method = lm) +
+        theme(legend.position="none")
+  figure <- ggarrange(full, validated, infolist[[1]], infolist[[2]], infolist[[3]], infolist[[4]], infolist[[5]], 
+                      labels = c("full data", "validated", paste0("m=", 1:length(imp))),
+                      ncol = length(imp) + 2, nrow = 1)
+  figure <- annotate_figure(figure, top = text_grob(paste("Validation Subset Size", nrow(data[[3]]))))
+  return (figure)
+}
+
+figure1 <- scatterFun(imp1, data1)
+figure2 <- scatterFun(imp2, data2)
+figure3 <- scatterFun(imp3, data3)
+figure4 <- scatterFun(imp2, data2)
+figure5 <- scatterFun(imp3, data3)
+
+result <- ggarrange(figure1, figure2, figure3, figure4, figure5, ncol = 1, nrow = 5)
+ggsave(result, file = "result.png", width = 20, height = 20)
 ```
 
 ```{r}
-data <- simFun(2000, 1000)
-imp <- mixgb(data[[2]], m = 5)
+tableFun <- function(data, imp){
+  full_fit <- lm(Y ~ X + Z, data = data[[1]][[1]])
+  row <- c("full data", nrow(data[[1]][[1]]), coef(full_fit)[2], sqrt(vcov(full_fit)[2, 2]), 
+            summary(full_fit)$coefficients[2, 4])
+  mat <- matrix(row, ncol = 5)
+  for (i in 1:length(imp)){
+    temp1 <- imp[[i]]
+    valid <- lm(Y ~ X + Z, data = data[[i]][[3]])
+    row <- c("validated", nrow(data[[i]][[3]]), coef(valid)[2], sqrt(vcov(valid)[2, 2]),
+              summary(valid)$coefficients[2, 4])
+    mat <- rbind(mat, row)
+    for (j in 1:length(temp1)){
+      temp2 <- temp1[[j]]
+      fit <- lm(Y ~ X + Z, data = temp2)
+      row <- c("impute", nrow(data[[i]][[3]]), coef(fit)[2], sqrt(vcov(fit)[2, 2]),
+                summary(fit)$coefficients[2, 4])
+      mat <- rbind(mat, row)
+    }
+  }
+  colnames(mat) <- c("status", "size", "est_X", "sd_X", "p-value_X")
+  return (mat)
+}
+tbl <- as.data.frame(tableFun(data, imp)) %>% 
+  mutate(size = as.numeric(size), est_X = as.numeric(est_X),
+         sd_X = as.numeric(sd_X),
+         `p-value_X` = as.numeric(`p-value_X`), 
+         id = c(10, rep(seq(0, 5), 9)))
+```
+
+# `with.mixgb()` copied the source code from `with.mids()`.
+## use the m imputed datasets from `mixgb()` to fit models, and converted into a `mira` object for later use in `pool()` function in `mice` package.
+```{r}
+with.mixgb <- function(data, expr){
+  analyses <- as.list(seq_len(length(data)))
+    for (i in seq_along(analyses)) {
+        data.i <- data[[1]]
+        analyses[[i]] <- eval(expr = substitute(expr), envir = data.i, 
+                              enclos = parent.frame())
+        if (is.expression(analyses[[i]])) {
+            analyses[[i]] <- eval(expr = analyses[[i]], envir = data.i, 
+                                  enclos = parent.frame())
+        }
+    }
+  object <- list(call = call, call1 = data$call, nmis = data$nmis, 
+                  analyses = analyses)
+  oldClass(object) <- c("mira", "matrix")
+  return (object)
+}
 ```
 
 ```{r}
-full_fit <- lm(Y ~ X + Z, data = data[[1]])
-valid_fit <- lm(Y ~ X + Z, data = data[[3]])
-imp_fit <- lm(Y ~ X + Z, data = imp[[1]])
+tableFun.pool <- function(imp, data){
+  full_fit <- lm(Y ~ X + Z, data = data[[1]][[1]])
+  row <- c("full data", nrow(data[[1]][[1]]), coef(full_fit)[2], sqrt(vcov(full_fit)[2, 2]), summary(full_fit)$coefficients[2, 4])
+  mat <- matrix(row, ncol = 5)
+  for (i in 1:length(imp)){
+    temp1 <- imp[[i]]
+    valid <- lm(Y ~ X + Z, data = data[[i]][[3]])
+    row <- c("validiated", nrow(data[[i]][[3]]), coef(valid)[2], sqrt(vcov(valid)[2, 2]), summary(valid)$coefficients[2, 4])
+    mat <- rbind(mat, row)
+    fitlist <- with.mixgb(imp[[i]], lm(Y ~ X + Z))
+    mat <- rbind(mat, c("impute", as.character(nrow(data[[i]][[3]])), as.character(summary(pool(fitlist))[2, c(2, 3, 6)])))
+  }
+  colnames(mat) <- c("status", "size", "est_X", "sd_X", "p-value_X")
+  return (mat)
+}
+tblpool <- as.data.frame(tableFun.pool(imp, data)) %>% 
+  mutate(size = as.numeric(size), est_X = as.numeric(est_X),
+         sd_X = as.numeric(sd_X),
+         `p-value_X` = as.numeric(`p-value_X`))
+```
 
-summary(full_fit)
-summary(valid_fit)
-summary(imp_fit)
+# Plotting the pooled estimates
+```{r}
+est <- ggplot(data = tblpool[-1, ], aes(x = size/100, y = est_X, color = status)) + 
+    geom_point() + geom_hline(yintercept=tblpool$est_X[1])
+se <- ggplot(data = tblpool[-1, ], aes(x = size/100, y = sd_X, color = status)) + 
+    geom_point() + geom_hline(yintercept=tblpool$sd_X[1])
+p <- ggplot(data = tblpool[-1, ], aes(x = size/100, y = `p-value_X`, color = status)) + 
+    geom_point() + geom_hline(yintercept=tblpool$`p-value_X`[1])
+figure <- ggarrange(est, se, p, 
+                      labels = c("estimate", "standard error", "p-value"),
+                      ncol = 2, nrow = 2)
+figure
+```
+
+
+```{r}
+est <- ggplot(data = tbl[-1, ], aes(x = id, y = est_X, color = status)) + 
+    geom_point() + geom_hline(yintercept=tbl$est_X[1]) + facet_wrap(~size)
 ```
