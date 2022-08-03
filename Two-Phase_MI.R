@@ -276,8 +276,8 @@ for (nsim in 1:Nsim) {
   if (nsim == 1){
     results_conv <- matrix(NA, nrow=Nsim, ncol=length(res))
     for (i in 1:length(res)) {
-      results_est[[i]]  <- matrix(NA, nrow=Nsim, ncol=1)
-      colnames(results_est[[i]]) <- c("X")
+      results_est[[i]]  <- matrix(NA, nrow=Nsim, ncol=3)
+      colnames(results_est[[i]]) <- c("intercept", "X", "Z")
     }
   }
   
