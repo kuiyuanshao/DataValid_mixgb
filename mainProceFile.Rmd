@@ -12,35 +12,31 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #install.packages("devtools")
 #devtools::install_github("agnesdeng/mixgb")
-#load mixgb
-library(mvtnorm)
-library(tidyverse)
-library(MASS)
 source("AutoMI.R")
 source("runFun.R")
 ```
 
 ```{r}
-set.seed(210818)
-Nsim <- 500
+Nsim <- 1000
 n  <- 2000
 n2 <- 500
 
 beta <- c(1, 1, 1)
 e_U <- c(sqrt(3),sqrt(3))
 mx <- 0; sx <- 1; zrange <- 1; zprob <- .5
-
-print_step <- 100
-res <- results_est <- list(0)
 ```
-
+# LM MI
+```{r}
+bias <- lm_imp[[1]][1, ]
+se<- lm_imp[[2]][1, ]
+mse <- lm_imp[[3]]
+```
 
 # Mixgb
 ```{r}
 mixgb_NULL <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL)
 info_mixgb_NULL <- cal(mixgb_NULL)
-  
   
 mixgb_1 <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1)
