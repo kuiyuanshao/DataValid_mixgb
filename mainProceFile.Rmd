@@ -17,7 +17,7 @@ source("runFun.R")
 ```
 
 ```{r}
-Nsim <- 1000
+Nsim <- 500
 n  <- 2000
 n2 <- 500
 
@@ -25,6 +25,29 @@ beta <- c(1, 1, 1)
 e_U <- c(sqrt(3),sqrt(3))
 mx <- 0; sx <- 1; zrange <- 1; zprob <- .5
 ```
+
+
+```{r}
+results_conv <- matrix(NA, nrow=Nsim, ncol=7)
+for (i in 1:7) {
+  results_est[[i]]  <- matrix(NA, nrow=Nsim, ncol=3)
+  colnames(results_est[[i]]) <- c("intercept", "X", "Z")
+}
+
+
+n_t <- 1e7
+simZ_t   <- rbinom(n_t, zrange, zprob)
+simX_t   <- (1-simZ_t)*rnorm(n_t, 0, 1) + simZ_t*rnorm(n_t, 0.5, 1)
+epsilon_t <- rnorm(n_t, 0, 1)
+simY_t    <- beta[1] + beta[2]*simX_t + beta[3]*simZ_t + epsilon_t
+simX_tilde_t <- simX_t + rnorm(n_t, 0, e_U[1]*(simZ_t==0) + e_U[2]*(simZ_t==1))
+data_t <- data.frame(Y_tilde=simY_t, X_tilde=simX_tilde_t, Y=simY_t, X=simX_t, Z=simZ_t)
+      
+v1 <- sd(resid(lm(X ~ X_tilde + Z, data=data_t))[data_t$Z==0])
+v2 <- sd(resid(lm(X ~ X_tilde + Z, data=data_t))[data_t$Z==1])
+vt <- c(v1, v2)
+```
+
 # LM MI
 ```{r}
 bias <- lm_imp[[1]][1, ]
@@ -32,39 +55,50 @@ se<- lm_imp[[2]][1, ]
 mse <- lm_imp[[3]]
 ```
 
+```{r}
+library(future.apply)
+plan(multisession, workers = 4)
+```
+
 # Mixgb
 ```{r}
-mixgb_NULL <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL)
-info_mixgb_NULL <- cal(mixgb_NULL)
+mixgb_NULL <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL))
+#info_mixgb_NULL <- cal(mixgb_NULL)
   
-mixgb_1 <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1)
-info_mixgb_1 <- cal(mixgb_1)
+mixgb_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1))
 
-mixgb_2 <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2)
+mixgb_2 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
+
+mice_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL))
+
+mice_cart <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "cart"))
+
+save(mixgb_1, mixgb_2, mice_1, mice_cart, file = "simulation.RData")
+
+info_mixgb_1 <- cal(mixgb_1)
 info_mixgb_2 <- cal(mixgb_2)
 ```
 
 
 # Mice
-```{r}
-mice_logreg <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg")
-info_mice_logreg <- cal(mice_logreg)
+```{r, warning = F}
+#mice_logreg <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg")
+#info_mice_logreg <- cal(mice_logreg)
 
-mice_logreg.boot <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg.boot")
-info_mice_logreg.boot <- cal(mice_logreg.boot)
+#mice_logreg.boot <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg.boot")
+#info_mice_logreg.boot <- cal(mice_logreg.boot)
 
-mice_cart <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "cart")
+mice_cart <- resultFun(1, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL)
 info_mice_cart <- cal(mice_cart)
 
-mice_rf <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "rf")
-info_mice_rf <- cal(mice_rf)
+#system.time(mice_rf <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "rf"))
+#info_mice_rf <- cal(mice_rf)
 ```
 
 

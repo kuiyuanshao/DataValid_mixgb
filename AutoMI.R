@@ -169,8 +169,7 @@ func_samp <- function(x,y,z=2000) {
   samps
 }
 cal <- function(results_est){
-  bias <- sapply(results_est, FUN = function(x) colMeans(x[1:Nsim,], na.rm=TRUE)) -
-    matrix(rep(beta), length(results_est), nrow=length(beta))
+  bias <- rowMeans(results_est) - 1
   se   <- sapply(results_est, FUN = function(x) apply(x[1:Nsim,], 2, var, na.rm=TRUE))
   mse <- t(bias)^2 + t(se)
   mse_ratio <- mse[1,2]/mse[,2]
