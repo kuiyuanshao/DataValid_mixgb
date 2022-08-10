@@ -169,9 +169,16 @@ func_samp <- function(x,y,z=2000) {
   samps
 }
 cal <- function(results_est){
-  bias <- rowMeans(results_est) - 1
-  se   <- sapply(results_est, FUN = function(x) apply(x[1:Nsim,], 2, var, na.rm=TRUE))
-  mse <- t(bias)^2 + t(se)
-  mse_ratio <- mse[1,2]/mse[,2]
-  return (list(round(bias*1000, 3), round(se*1000, 3), round(mse_ratio*1000,3)))
+  temp <- NULL
+  for (i in 1:Nsim){
+    temp <- cbind(temp, unlist(results_est[, i]))
+  }
+  bias <- rowMeans(temp) - 1
+  se   <- apply(temp, 1, var)
+  
+  bias_m <- rbind(bias, bias, bias)
+  se_m <- rbind(se, se, se)
+  
+  mse <- t(bias_m)^2 + t(se_m)
+  return (list(round(bias*1000, 3), round(se*1000, 3), round(mse[, 1]*1000,3)))
 }

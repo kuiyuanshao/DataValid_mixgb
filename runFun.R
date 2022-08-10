@@ -21,7 +21,8 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     ## SRS
     id_phase2 <- c(sample(n, n2))
     dat_srs   <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
-                                 X = ifelse(R==0, NA, X))
+                                 X = ifelse(R==0, NA, X), 
+                                 weights = ifelse(R==0, NA, n/n2))
     if (tool == "mixgb"){
       res[[1]]  <- mixgbmi(data=dat_srs, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -34,6 +35,11 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     id_phase2 <- c(sample((1:n)[data$Z==0], n2/2), sample((1:n)[data$Z==1], n2/2))
     dat_ssrs  <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
                                  X = ifelse(R==0, NA, X))
+    dat_ssrs$weights <- NA
+    dat_ssrs$weights[id_phase2[1:(n2/2)]] <- rep(1/(n2/2/sum(data$Z==0)), n2/2)
+    dat_ssrs$weights[id_phase2[(n2/2 + 1):n2]] <- rep(1/(n2/2/sum(data$Z==1)), n2/2)
+    
+
     if (tool == "mixgb"){
       res[[2]]  <- mixgbmi(data=dat_ssrs, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -47,6 +53,8 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     id_phase2 <- c(order_Y[1:(n2/2)], order_Y[(n-n2/2+1):n])
     dat_ods   <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
                                  X = ifelse(R==0, NA, X))
+    dat_ods$outcome <- NA
+    dat_ods$outcome[id_phase2] <- abs(data$Y_tilde[id_phase2] - median(data$Y_tilde))
     if (tool == "mixgb"){
       res[[3]]  <- mixgbmi(data=dat_ods, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -55,11 +63,14 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
       res[[3]] <- mrangermi(data=dat_ods, N=20)$coefs
     }
     
+    
     ## RS
     order_Y   <- order(residuals(lm(Y_tilde ~ Z, data=data)))
     id_phase2 <- c(order_Y[1:(n2/2)], order_Y[(n-n2/2+1):n])
     dat_rs    <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
                                  X = ifelse(R==0, NA, X))
+    dat_rs$resid <- NA
+    dat_rs$resid[id_phase2] <- abs(residuals(lm(Y_tilde ~ Z, data=data))[id_phase2] - median(order_Y))
     if (tool == "mixgb"){
       res[[4]]  <- mixgbmi(data=dat_rs, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -73,6 +84,8 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     id_phase2 <- c(order_Y[1:(n2/2)], order_Y[(n-n2/2+1):n])
     dat_wrs   <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
                                  X = ifelse(R==0, NA, X))
+    dat_wrs$weighted_resid <- 0
+    dat_wrs$weighted_resid <- abs((residuals(lm(Y_tilde ~ Z, data=data))*vt[data$Z+1])[id_phase2] - median(order_Y))
     if (tool == "mixgb"){
       res[[5]]  <- mixgbmi(data=dat_wrs, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -86,6 +99,7 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     id_phase2 <- c(order_Y[1:(n2/2)], order_Y[(n-n2/2+1):n])
     dat_if   <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
                                 X = ifelse(R==0, NA, X))
+    dat_if$score <- abs((residuals(lm(Y_tilde ~ Z, data=data))*data$X_tilde)[id_phase2] - median(order_Y))
     if (tool == "mixgb"){
       res[[6]]  <- mixgbmi(data=dat_if, N=20, method)$coefs
     }else if (tool == "mice"){
@@ -104,6 +118,15 @@ resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx,
     samps    <- func_samp(IFRS_strata, IFnods3)
     dat_srs2 <- data %>% mutate(R = ifelse(c(1:n) %in% samps, 1, 0), 
                                 X = ifelse(R==0, NA, X))
+    ind_sub1 <- which(samps %in% which(IFRS_strata == 1))
+    ind_sub2 <- which(samps %in% which(IFRS_strata == 2))
+    ind_sub3 <- which(samps %in% which(IFRS_strata == 3))
+    dat_srs2$weights <- NA
+    dat_srs2$weights[samps[ind_sub1]] = 1 / (length(ind_sub1) / table(IFRS_strata)[1])
+    dat_srs2$weights[samps[ind_sub2]] = 1 / (length(ind_sub2) / table(IFRS_strata)[2])
+    dat_srs2$weights[samps[ind_sub3]] = 1 / (length(ind_sub3) / table(IFRS_strata)[3])
+    dat_srs2$score <- NA
+    dat_srs2$score[samps] <- abs(IFRS[samps] - median(IFRS))
     if (tool == "mixgb"){
       res[[7]]  <- mixgbmi(data=dat_srs2, N=20, method)$coefs
     }else if (tool == "mice"){

@@ -50,10 +50,45 @@ vt <- c(v1, v2)
 
 # LM MI
 ```{r}
-bias <- lm_imp[[1]][1, ]
-se<- lm_imp[[2]][1, ]
-mse <- lm_imp[[3]]
+bias_m <- lm_imp[[1]][1, ]
+se_m <- lm_imp[[2]][1, ]
+mse_m <- lm_imp[[3]][, 1]
 ```
+
+```{r}
+#load("simulation.RData")
+info_mixgb_NULL <- cal(mixgb_NULL)
+info_mixgb_1 <- cal(mixgb_1)
+info_mixgb_2 <- cal(mixgb_2)
+info_mice <- cal(mice_1)
+info_mice_cart <- cal(mice_cart)
+```
+
+```{r}
+bias_m <- rbind(bias_m, info_mixgb_NULL[[1]], info_mixgb_1[[1]], info_mixgb_2[[1]], info_mice[[1]], info_mice_cart[[1]])
+se_m <- rbind(se_m, info_mixgb_NULL[[2]], info_mixgb_1[[2]], info_mixgb_2[[2]], info_mice[[2]], info_mice_cart[[2]])
+mse_m <- rbind(mse_m, info_mixgb_NULL[[3]], info_mixgb_1[[3]], info_mixgb_2[[3]], info_mice[[3]], info_mice_cart[[3]])
+rownames(bias_m) <- c("Linear Model Imputation", "MIXGB with pmm NULL", "MIXGB with pmm 1", "MIXGB with pmm 2", "MICE by Default", "MICE with Regression Trees")
+colnames(bias_m) <- c("Simple Random Sampling", "Stratified Simple Random Sampling", "Outcome-Dependent Sampling", "Residual Sampling", "Weighted Residual Sampling", "Score Function Sampling", "Score Function Sampling with Neyman Allocation")
+rownames(se_m) <- c("Linear Model Imputation", "MIXGB with pmm NULL", "MIXGB with pmm 1", "MIXGB with pmm 2", "MICE by Default", "MICE with Regression Trees")
+colnames(se_m) <- c("Simple Random Sampling", "Stratified Simple Random Sampling", "Outcome-Dependent Sampling", "Residual Sampling", "Weighted Residual Sampling", "Score Function Sampling", "Score Function Sampling with Neyman Allocation")
+rownames(mse_m) <- c("Linear Model Imputation", "MIXGB with pmm NULL", "MIXGB with pmm 1", "MIXGB with pmm 2", "MICE by Default", "MICE with Regression Trees")
+colnames(mse_m) <- c("Simple Random Sampling", "Stratified Simple Random Sampling", "Outcome-Dependent Sampling", "Residual Sampling", "Weighted Residual Sampling", "Score Function Sampling", "Score Function Sampling with Neyman Allocation")
+
+library(gridExtra)
+png("bias_m.png", height = 50*nrow(bias_m), width = 300*ncol(bias_m))
+grid.table(bias_m)
+dev.off()
+
+png("se_m.png", height = 50*nrow(bias_m), width = 300*ncol(bias_m))
+grid.table(se_m)
+dev.off()
+
+png("mse_m.png", height = 50*nrow(bias_m), width = 300*ncol(bias_m))
+grid.table(mse_m)
+dev.off()
+```
+
 
 ```{r}
 library(future.apply)
@@ -65,11 +100,10 @@ plan(multisession, workers = 4)
 mixgb_NULL <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL))
 #info_mixgb_NULL <- cal(mixgb_NULL)
-  
 mixgb_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1))
 
-mixgb_2 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+mixgb_2 <- future_replicate(200, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
 
 mice_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
