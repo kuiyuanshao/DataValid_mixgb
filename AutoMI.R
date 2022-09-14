@@ -4,8 +4,22 @@ library(missRanger)
 library(mitools)
 library(tidyverse)
 library(MASS)
+library(survey)
 #pmm.type = 0, 1, 2
-mixgbmi <- function(data, N, method){
+mixgbmi <- function(data, N, method, strategy = "else"){
+  if (strategy == "srs"){
+    design <- svydesign(id = ~ 1, prob = ~ prob, data = data) 
+    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+  }else if (strategy == "ssrs"){
+    design <- svydesign(id = ~ 1, strata = ~ Z, prob = ~ prob, data = data)
+    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+  }else if (strategy == "srs2"){
+    design <- svydesign(id = ~ 1, strata = ~ strata, prob = ~ prob, data = data)
+    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+  }else{
+    lm <- lm(Y ~ X_tilde + Z, data = data)
+  }
+  data$resid <- resid(lm)
   midata <- mixgb(data, m = N, pmm.type = method)
   modcoef <- modvar <- NULL
   for (i in 1:N){
@@ -17,7 +31,6 @@ mixgbmi <- function(data, N, method){
   vars <- mean(modvar) + (N + 1) * var(modcoef) / N
   return (list(coefs=coefs, vars=vars))
 }
-
 #logreg, logreg.boot, cart, rf
 micemi <- function(data, N, method){
   midata <- mice(data, m = N, print=FALSE, method = method)

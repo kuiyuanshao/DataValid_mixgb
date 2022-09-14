@@ -28,6 +28,7 @@ mx <- 0; sx <- 1; zrange <- 1; zprob <- .5
 
 
 ```{r}
+results_est <- list(0)
 results_conv <- matrix(NA, nrow=Nsim, ncol=7)
 for (i in 1:7) {
   results_est[[i]]  <- matrix(NA, nrow=Nsim, ncol=3)
@@ -48,12 +49,79 @@ v2 <- sd(resid(lm(X ~ X_tilde + Z, data=data_t))[data_t$Z==1])
 vt <- c(v1, v2)
 ```
 
+
+```{r}
+library(future.apply)
+plan(multisession, workers = 4)
+```
+
+# Mixgb
+```{r}
+mixgb_NULL <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL))
+#info_mixgb_NULL <- cal(mixgb_NULL)
+mixgb_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1))
+
+mixgb_2 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
+
+mice_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL))
+
+mice_cart <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "cart"))
+
+save(mixgb_1, mixgb_2, mice_1, mice_cart, file = "simulation.RData")
+
+info_mixgb_1 <- cal(mixgb_1)
+info_mixgb_2_weight <- cal(mixgb_2)
+info_mixgb_2_weight_1 <- cal(mixgb_2_1_1)
+
+
+mixgb_2_3 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
+
+cal(mixgb_2)
+cal(mixgb_2_3)
+```
+
+```{r}
+info_mixgb_2 
+#with weighting or the information of selected score and residual but without linear regression.
+info_mixgb_2_weight 
+```
+# Mice
+```{r, warning = F}
+#mice_logreg <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg")
+#info_mice_logreg <- cal(mice_logreg)
+
+#mice_logreg.boot <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg.boot")
+#info_mice_logreg.boot <- cal(mice_logreg.boot)
+
+mice_cart <- resultFun(1, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL)
+info_mice_cart <- cal(mice_cart)
+
+#system.time(mice_rf <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "rf"))
+#info_mice_rf <- cal(mice_rf)
+```
+
+
+# MissRanger
+```{r}
+mranger <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mrangermi", method = NULL)
+info_mranger <- cal(mranger)
+```
+
 # LM MI
 ```{r}
 bias_m <- lm_imp[[1]][1, ]
 se_m <- lm_imp[[2]][1, ]
 mse_m <- lm_imp[[3]][, 1]
 ```
+
 
 ```{r}
 #load("simulation.RData")
@@ -87,58 +155,4 @@ dev.off()
 png("mse_m.png", height = 50*nrow(bias_m), width = 300*ncol(bias_m))
 grid.table(mse_m)
 dev.off()
-```
-
-
-```{r}
-library(future.apply)
-plan(multisession, workers = 4)
-```
-
-# Mixgb
-```{r}
-mixgb_NULL <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = NULL))
-#info_mixgb_NULL <- cal(mixgb_NULL)
-mixgb_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 1))
-
-mixgb_2 <- future_replicate(200, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
-
-mice_1 <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL))
-
-mice_cart <- future_replicate(Nsim, resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = "cart"))
-
-save(mixgb_1, mixgb_2, mice_1, mice_cart, file = "simulation.RData")
-
-info_mixgb_1 <- cal(mixgb_1)
-info_mixgb_2 <- cal(mixgb_2)
-```
-
-
-# Mice
-```{r, warning = F}
-#mice_logreg <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg")
-#info_mice_logreg <- cal(mice_logreg)
-
-#mice_logreg.boot <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "logreg.boot")
-#info_mice_logreg.boot <- cal(mice_logreg.boot)
-
-mice_cart <- resultFun(1, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mice", method = NULL)
-info_mice_cart <- cal(mice_cart)
-
-#system.time(mice_rf <- resultFun(1, n, n2, beta, e_U, mx, sx, zrange, zprob, print_step, res, results_est, tool = "mice", method = "rf"))
-#info_mice_rf <- cal(mice_rf)
-```
-
-
-# MissRanger
-```{r}
-mranger <- resultFun(Nsim, n, n2, beta, e_U, mx, sx, 
-                      zrange, zprob, print_step, res, results_est, tool = "mrangermi", method = NULL)
-info_mranger <- cal(mranger)
 ```
