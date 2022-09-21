@@ -9,20 +9,32 @@ library(survey)
 mixgbmi <- function(data, N, method, strategy = "else"){
   if (strategy == "srs"){
     design <- svydesign(id = ~ 1, prob = ~ prob, data = data) 
-    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+    lm <- svyglm(X ~ X_tilde + Y + Z, design = design, family = gaussian())
   }else if (strategy == "ssrs"){
     design <- svydesign(id = ~ 1, strata = ~ Z, prob = ~ prob, data = data)
-    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+    lm <- svyglm(X ~ X_tilde + Y + Z, design = design, family = gaussian())
   }else if (strategy == "srs2"){
     design <- svydesign(id = ~ 1, strata = ~ strata, prob = ~ prob, data = data)
-    lm <- svyglm(Y ~ X_tilde + Z, design = design, family = gaussian())
+    lm <- svyglm(X ~ X_tilde + Y + Z, design = design, family = gaussian())
   }else{
-    lm <- lm(Y ~ X_tilde + Z, data = data)
+    lm <- lm(X ~ X_tilde + Y + Z, data = data)
   }
-  data$resid <- resid(lm)
-  midata <- mixgb(data, m = N, pmm.type = method)
+  data$resid[data$R == 1] <- resid(lm, type = "pearson")
+  #data$fitted <- lm$fitted.values
+  #resid_data <- data[, -4]
+  nround <- NULL
+  for (i in 1:10){
+    cv.results <- mixgb_cv(data, verbose = F, response = "X")
+    nround[i] <- cv.results$best.nrounds
+  }
+  nround <- as.integer(mean(nround))
+  midata <- mixgb(data, m = N, pmm.type = 2, nrounds = nround)
   modcoef <- modvar <- NULL
   for (i in 1:N){
+    #midata[[i]]$X <- NA
+    #midata[[i]]$X[data$R == 0] <- data$fitted[data$R == 0] + midata[[1]]$resid[data$R == 0]
+    #midata[[i]]$X[data$R == 1] <- data$X[data$R == 1]
+    
     modi <- lm(Y ~ X + Z, data=midata[[i]])
     modcoef[i] <- modi$coeff[2]
     modvar[i] <- summary(modi)$coeff[2,2]^2

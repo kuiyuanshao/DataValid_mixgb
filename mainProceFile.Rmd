@@ -18,8 +18,8 @@ source("runFun.R")
 
 ```{r}
 Nsim <- 500
-n  <- 2000
-n2 <- 500
+n  <- 4000
+n2 <- 1000
 
 beta <- c(1, 1, 1)
 e_U <- c(sqrt(3),sqrt(3))
@@ -87,9 +87,9 @@ cal(mixgb_2_3)
 ```
 
 ```{r}
-info_mixgb_2 
-#with weighting or the information of selected score and residual but without linear regression.
-info_mixgb_2_weight 
+mixgb_2 <- future_replicate(Nsim, resultFun2(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool = "mixgb", method = 2))
+(mean(unlist(mixgb_2)) - 1) * 1000
 ```
 # Mice
 ```{r, warning = F}

@@ -4,7 +4,34 @@ library(missRanger)
 library(mitools)
 library(tidyverse)
 library(MASS)
-
+resultFun2 <- function(Nsim, n, n2, beta, e_U, mx, sx, 
+                      zrange, zprob, print_step, res, results_est, tool, method,
+                      weights = T){
+  res <- list (0)
+  simZ   <- rbinom(n, zrange, zprob)
+  simX   <- (1-simZ)*rnorm(n, 0, 1) + simZ*rnorm(n, 0.5, 1)
+  #error
+  epsilon <- rnorm(n, 0, 1)
+  #Y is added with epsilon
+  simY    <- beta[1] + beta[2]*simX + beta[3]*simZ + epsilon
+  #make X_star depends on it
+  simX_tilde <- simX + rnorm(n, 0, e_U[1]*(simZ==0) + e_U[2]*(simZ==1))
+  data <- data.frame(Y_tilde=simY, X_tilde=simX_tilde, Y=simY, X=simX, Z=simZ)
+  ##### Designs
+  ## SRS
+  id_phase2 <- c(sample(n, n2))
+  dat_srs   <- data %>% mutate(R = ifelse(c(1:n) %in% id_phase2, 1, 0), 
+                               X = ifelse(R==0, NA, X))
+  dat_srs$prob <- 1 / dim(dat_srs)[1]
+  if (tool == "mixgb"){
+    res[[1]]  <- mixgbmi(data=dat_srs, N=20, method, strategy = "srs")$coefs
+  }else if (tool == "mice"){
+    res[[1]] <- micemi(data=dat_srs, N=20, method = method)$coefs
+  }else{
+    res[[1]] <- mrangermi(data=dat_srs, N=20)$coefs
+  }
+  return (res)
+}
 resultFun <- function(Nsim, n, n2, beta, e_U, mx, sx, 
                       zrange, zprob, print_step, res, results_est, tool, method,
                       weights = T){
