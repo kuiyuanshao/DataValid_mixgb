@@ -19,26 +19,34 @@ mixgbmi <- function(data, N, method, strategy = "else"){
   }else{
     lm <- lm(X ~ X_tilde + Y + Z, data = data)
   }
-  data$resid[data$R == 1] <- resid(lm, type = "pearson")
-  #data$fitted <- lm$fitted.values
-  #resid_data <- data[, -4]
+  data$resid[data$R == 1] <- residuals(lm)
+  data$fitted[data$R == 1] <- lm$fitted.values
+  data$fitted[data$R == 0] <- predict(lm, data[data$R == 0, ], type = "response")
+  resid_data <- data[, -4]
   nround <- NULL
   for (i in 1:10){
-    cv.results <- mixgb_cv(data, verbose = F, response = "X")
+    cv.results <- mixgb_cv(resid_data, verbose = F, response = "resid")
     nround[i] <- cv.results$best.nrounds
   }
   nround <- as.integer(mean(nround))
-  midata <- mixgb(data, m = N, pmm.type = 2, nrounds = nround)
+  midata <- mixgb(resid_data, m = N, nrounds = nround)
   modcoef <- modvar <- NULL
   for (i in 1:N){
-    #midata[[i]]$X <- NA
-    #midata[[i]]$X[data$R == 0] <- data$fitted[data$R == 0] + midata[[1]]$resid[data$R == 0]
-    #midata[[i]]$X[data$R == 1] <- data$X[data$R == 1]
+    midata[[i]]$X <- NA
+    yhatobs <- data$fitted[data$R == 1] + midata[[i]]$resid[data$R == 1]
+    yhatmis <- data$fitted[data$R == 0] + midata[[i]]$resid[data$R == 0]
+    yobs <- data$X[data$R == 1]
+    idx <- mice::matchindex(yhatobs, yhatmis, k = 5)
+    yhatmis <- yobs[idx]
+    
+    midata[[i]]$X[data$R == 1] <- data$X[data$R == 1]
+    midata[[i]]$X[data$R == 0] <- yhatmis
     
     modi <- lm(Y ~ X + Z, data=midata[[i]])
     modcoef[i] <- modi$coeff[2]
     modvar[i] <- summary(modi)$coeff[2,2]^2
   }
+  
   coefs <- mean(modcoef)
   vars <- mean(modvar) + (N + 1) * var(modcoef) / N
   return (list(coefs=coefs, vars=vars))
